@@ -7,6 +7,7 @@ function ex(){
  <div class="card"><h2>Összefoglaló exportálása</h2><p class="mute">Töltsd le a naplódat táblázatként, heti vagy havi bontásban.</p>
  <div class="row"><button class="btn ghost" onclick="downloadReport('week')">Heti CSV</button><button class="btn ghost" onclick="downloadReport('month')">Havi CSV</button></div>
  <p id="reportStatus" class="mute" role="status" aria-live="polite"></p></div>
+ ${aiPanel()}
  ${reminderPanel()}
  <div class="card"><h2>Telepítés a telefonra</h2><p class="mute">iPhone: nyisd meg Safariban, majd Megosztás, Főképernyőhöz adás. Android: Chrome menü, Hozzáadás a kezdőképernyőhöz. Utána külön appként, teljes képernyőn indul.</p></div>`}
 function dl(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));a.download="forma-mentes.json";a.click()}
