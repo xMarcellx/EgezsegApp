@@ -1,3 +1,45 @@
+function parseWorkoutExport(txt){
+ const lines=txt.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+ const title=lines[0]||"";
+ const dateLine=lines.find(line=>/^[A-Za-z]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}\s+at\s+\d{1,2}:\d{2}$/i.test(line));
+ const dateMatch=dateLine&&dateLine.match(/^[A-Za-z]+,\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})\s+at\s+\d{1,2}:\d{2}$/i);
+ const months={january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",july:"07",august:"08",september:"09",october:"10",november:"11",december:"12"};
+ const date=dateMatch&&months[dateMatch[1].toLowerCase()]
+  ?`${dateMatch[3]}-${months[dateMatch[1].toLowerCase()]}-${dateMatch[2].padStart(2,"0")}`
+  :null;
+ const summary=lines.find(line=>/^\d+\s+Exercises\b/i.test(line))||"";
+ const durationMatch=summary.match(/\b(\d+)\s*h\s*(\d+)\s*m\b/i);
+ let exercise="",sets=0;
+ const items=[];
+ for(const line of lines){
+  const exerciseMatch=line.match(/^\d+\.\s+(.+)$/);
+  if(exerciseMatch){exercise=exerciseMatch[1];continue}
+  const setMatch=line.match(/^Set\s+(\d+)\s*:\s*(?:(\d+(?:[.,]\d+)?)\s*kg\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*reps?\s*(?:\[([^\]]+)\])?$/i);
+  if(!exercise||!setMatch)continue;
+  const reps=num(setMatch[3]);
+  if(reps==null)continue;
+  items.push({
+   type:"ex",n:exercise,s:1,r:setMatch[3],ra:reps,
+   kg:setMatch[2]==null?null:num(setMatch[2]),done:true,
+   setNo:+setMatch[1],effort:setMatch[4]||""
+  });
+  sets++;
+ }
+ if(!sets)return null;
+ return{title,date,dur:durationMatch?+durationMatch[1]*60+(+durationMatch[2]):null,items};
+}
+function saveWorkoutImport(imported){
+ const selectedDate=$("#wd").value;
+ S.workouts.push({
+  id:uid(),
+  date:imported.date&&(!selectedDate||selectedDate===today())?imported.date:selectedDate||today(),
+  title:$("#wn").value||imported.title,
+  items:imported.items,
+  ...(imported.dur==null?{}:{dur:imported.dur})
+ });
+ save();wo();
+ $("#wst").textContent="Az exportált edzés adatai elmentve.";
+}
 function parseWorkout(txt){
  return txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{
   const sr=l.match(/(\d+)\s*(?:sorozat|szett|set)\w*\s*[x,]?\s*(\d+(?:-\d+)?)\s*(?:ism\w*|rep\w*)?/i)||l.match(/(\d+)\s*[x×*]\s*(\d+(?:\s*[-–]\s*\d+)?)/i);
@@ -7,8 +49,14 @@ function parseWorkout(txt){
   const reps=sr[2].split(/[-–]/).map(Number);
   return{type:"ex",n:n||"Gyakorlat",s:+sr[1],r:sr[2].replace(/\s/g,""),ra:avg(reps),kg:kg?num(kg[1]):null,done:false}
  })}
-const vol=w=>w.items.reduce((t,i)=>t+(i.type==="ex"&&i.kg&&i.done?i.s*i.ra*i.kg:0),0);
 function bwAt(d){const a=[...S.weights].sort((x,y)=>x.date<y.date?-1:1);if(!a.length)return null;let r=a[0].kg;for(const x of a)if(x.date<=d)r=x.kg;return r}
+const isBodyweightExercise=i=>/\b(?:dips?|chin[\s-]?ups?)\b/i.test(i.n||"");
+const workoutLoad=i=>i.kg==null&&isBodyweightExercise(i)?bwAt(today()):i.kg==null?null:num(i.kg);
+const vol=w=>w.items.reduce((t,i)=>{
+ if(i.type!=="ex"||!i.done)return t;
+ const kg=workoutLoad(i);
+ return kg==null?t:t+i.s*i.ra*kg
+},0);
 const estMin=w=>{const e=w.items.filter(i=>i.type==="ex"),dn=e.filter(i=>i.done);return Math.round((dn.length?dn:e).reduce((t,i)=>t+i.s,0)*2.5+w.items.filter(i=>i.type==="cardio").reduce((t,i)=>t+(i.min||0),0))};
 const durOf=w=>w.dur!=null?w.dur:estMin(w);
 const kcalOf=w=>{const b=bwAt(w.date);return b?Math.round(((w.met||5)-1)*b*durOf(w)/60):null};
@@ -145,27 +193,29 @@ function wo(){
  const list=[...S.workouts].sort((a,b)=>a.date<b.date?1:-1);
  const wk={};list.forEach(w=>(wk[mon(w.date)]=wk[mon(w.date)]||[]).push(w));
  $("#app").innerHTML=`<div class="card"><h2>Új edzés a programból</h2>
- <p class="mute">Másold be az edzőtől kapott szöveget. Soronként ismeri fel a „Guggolás 4x8 60kg” formátumot; a többi sor jegyzet marad.</p>
+ <p class="mute">Másold be az edzőtől kapott szöveget. Felismeri a „Guggolás 4x8 60kg” formátumot és az exportált edzésnaplót is, a sorozatok súlyával és ismétlésszámával. A saját testsúlyos dip és chin-up gyakorlatok volumenéhez a legutóbb rögzített testsúlyt számolja.</p>
  <p class="mute">A kalóriát az intenzitásból (MET-érték), a testsúlyodból és az időtartamból becsüli. Ez a nyugalmi anyagcsere feletti többletégetés, ezért hozzáadhatod a napi alapszükségletedhez. A becslés akár 30%-kal is eltérhet a valóságtól.</p>
  <div class="row" style="margin-bottom:10px"><label>Dátum<input type="date" id="wd" value="${today()}"></label>
  <label>Cím<input id="wn" placeholder="pl. Láb nap"></label></div>
  <textarea id="wt" placeholder="Guggolás 4x8 60kg&#10;Román felhúzás 3x10 50kg&#10;Plank 3x45mp"></textarea>
  <p class="row"><button class="btn" onclick="addWai(this)" ${claudeAvailable?"":"disabled"}>${claudeAvailable?"Feldolgozás Claude-dal":"Claude-kulcs szükséges"}</button><button class="btn ghost" onclick="addW()">Gyors feldolgozás</button></p>
- <p id="wst" class="mute">${claudeAvailable?"A Claude-feldolgozás elérhető. A gyors feldolgozás a „gyakorlat 4x8 60kg” formátumot ismeri.":"A Claude-feldolgozáshoz add meg az Anthropic API-kulcsodat a Mentés fülön. Az API használata külön díjas."}</p></div>
+ <p id="wst" class="mute">${claudeAvailable?"A Claude-feldolgozás elérhető. Az exportált edzésnaplót a gyors feldolgozás internetkapcsolat és API-kulcs nélkül is felismeri.":"A Claude-feldolgozáshoz add meg az Anthropic API-kulcsodat a Mentés fülön. Az API használata külön díjas. Az exportált edzésnaplót a gyors feldolgozás is felismeri."}</p></div>
  
  ${workoutTemplatesPanel()}
  ${personalRecordsPanel()}
  ${Object.keys(wk).sort().reverse().map(k=>`<div class="card"><h2>Hét: ${k} (${wk[k].length} edzés, ${Math.round(wk[k].reduce((t,w)=>t+vol(w),0))} kg összmennyiség${wk[k].some(w=>kcalOf(w))?`, kb. ${wk[k].reduce((t,w)=>t+(kcalOf(w)||0),0)} kcal`:""})</h2>
  ${wk[k].map(w=>`<div class="wk"><div class="row" style="justify-content:space-between"><h3>${w.date} – ${esc(w.title||"Edzés")}</h3><button class="x" title="Törlés" onclick="delW('${w.id}')">✕</button></div>
  <div class="scroll"><table>${w.items.map((i,ix)=>i.type==="note"?`<tr><td colspan="4" class="note">${esc(i.n)}</td></tr>`:i.type==="cardio"?`<tr><td><input type="checkbox" ${i.done?"checked":""} onchange="upW('${w.id}',${ix},'done',this.checked)" aria-label="Kész"></td><td>${esc(i.n)}</td><td colspan="2">${i.min} perc</td></tr>`:
- `<tr><td><input type="checkbox" ${i.done?"checked":""} onchange="upW('${w.id}',${ix},'done',this.checked)" aria-label="Kész"></td><td>${esc(i.n)}</td><td>${i.s}×${i.r}</td>
- <td><input type="number" step="0.5" value="${i.kg??""}" placeholder="kg" onchange="upW('${w.id}',${ix},'kg',this.value)"> kg</td></tr>`).join("")}</table></div>
+ `<tr><td><input type="checkbox" ${i.done?"checked":""} onchange="upW('${w.id}',${ix},'done',this.checked)" aria-label="Kész"></td><td>${esc(i.n)}</td><td>${i.setNo?`${i.setNo}. szett · ${esc(i.r)} ism.`:`${i.s}×${i.r}`}${i.effort?` <span class="mute">[${esc(i.effort)}]</span>`:""}</td>
+ <td><input type="number" step="0.5" value="${workoutLoad(i)??""}" placeholder="kg" onchange="upW('${w.id}',${ix},'kg',this.value)"> kg</td></tr>`).join("")}</table></div>
  <div class="row" style="margin-top:10px"><label>Időtartam (perc)<input type="number" value="${w.dur??""}" placeholder="${estMin(w)}" onchange="upM('${w.id}','dur',this.value)"></label>
  <label>Intenzitás<select onchange="upM('${w.id}','met',this.value)">${[[3.5,"Könnyű"],[5,"Közepes"],[6,"Intenzív"]].concat([3.5,5,6].includes(w.met)||!w.met?[]:[[w.met,"Becsült ("+f(w.met)+" MET)"]]).map(([m,n])=>`<option value="${m}" ${(w.met||5)===m?"selected":""}>${n}</option>`).join("")}</select></label>
  <div>${kcalBox(w)}<div class="mute">${Math.round(vol(w))} kg elvégzett mennyiség${w.dur==null?", az időtartamot a sorozatokból becsüli":""}</div>${w.why?`<div class="mute">${esc(w.why)}</div>`:""}</div></div></div>`).join("")}</div>`).join("")||`<div class="card mute">Még nincs rögzített edzés.</div>`}`;
 }
 async function addWai(btn){
  const t=$('#wt').value;if(!t.trim())return;
+ const imported=parseWorkoutExport(t);
+ if(imported){saveWorkoutImport(imported);return}
  const st=$('#wst');st.textContent='Claude elemzi az edzést…';btn.disabled=true;
  try{
   const r=await aiJson(`Edzésprogram-elemző vagy. Alakítsd át az alábbi, edzőtől másolt szöveget strukturált adattá, és becsüld meg az edzés energiafelhasználásának alapjait.
@@ -192,6 +242,8 @@ ${t}`);
 function addW(){
  const text=$("#wt").value.trim();
  if(!text){$("#wst").textContent="Írj be legalább egy gyakorlatot vagy megjegyzést.";return}
+ const imported=parseWorkoutExport(text);
+ if(imported){saveWorkoutImport(imported);return}
  S.workouts.push({id:uid(),date:$("#wd").value||today(),title:$("#wn").value,items:parseWorkout(text)});
  save();wo();$("#wst").textContent="Az edzés elmentve.";
 }

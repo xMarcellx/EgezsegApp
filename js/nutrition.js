@@ -2,8 +2,8 @@ function fd(){
  const l=[...S.food].sort((a,b)=>a.date<b.date?1:-1);
  $("#app").innerHTML=`<div class="card"><h2>Napi kalória</h2><div class="row">
  <label>Dátum<input type="date" id="fdt" value="${today()}"></label>
- <label>Bevitt kcal<input type="number" id="fin" placeholder="2200"></label>
- <label>Elégetett kcal<input type="number" id="fout" placeholder="2600"></label>
+ <label>Bevitt kcal<input type="number" id="fin" min="0" max="20000" oninput="if(this.value<0)this.value=0" placeholder="2200"></label>
+ <label>Elégetett kcal<input type="number" id="fout" min="0" max="20000" oninput="if(this.value<0)this.value=0" placeholder="2600"></label>
  <button class="btn" onclick="addF()">Mentés</button></div>
  <p id="foodStatus" class="mute" role="status" aria-live="polite"></p>
  <p class="mute">Ha ugyanarra a napra újra mentesz, felülírja az előzőt. Negatív egyenleg = kalóriadeficit.</p></div>
