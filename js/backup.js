@@ -75,7 +75,7 @@ function up(file){
    if(!Array.isArray(S.templates))S.templates=[];
    if(!S.reminders||typeof S.reminders!=="object")S.reminders={enabled:false,type:"water",time:"20:00",lastDate:""};
    save();ex();$("#em").textContent="Sikeres visszatöltés.";
-  }catch(e){$("#em").textContent="A mentésfájl hibás vagy nem a Forma alkalmazásból származik."}
+  }catch(e){$("#em").textContent="A mentésfájl hibás vagy nem a Lock in alkalmazásból származik."}
  };
  reader.readAsText(file);
 }

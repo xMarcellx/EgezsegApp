@@ -20,11 +20,11 @@ function reminderPanel(){
 
 function reminderMessage(type){
  const messages={
-  workout:["Forma – edzés-emlékeztető","Ha ma terveztél edzeni, itt az ideje feljegyezni az edzésed."],
-  water:["Forma – vízemlékeztető","Nézd meg a mai víznaplódat, és rögzítsd, amit ittál."],
-  sleep:["Forma – alvásnapló","Ne felejtsd el rögzíteni a legutóbbi alvásodat."],
-  measurement:["Forma – testsúlymérés","Ha ma van a szokásos mérési napod, rögzítsd a testsúlyodat."],
-  backup:["Forma – adatmentés","A heti adatmentési emlékeztetőd: töltsd le a mentésfájlt a Mentés fülön."]
+  workout:["Lock in – edzés-emlékeztető","Ha ma terveztél edzeni, itt az ideje feljegyezni az edzésed."],
+  water:["Lock in – vízemlékeztető","Nézd meg a mai víznaplódat, és rögzítsd, amit ittál."],
+  sleep:["Lock in – alvásnapló","Ne felejtsd el rögzíteni a legutóbbi alvásodat."],
+  measurement:["Lock in – testsúlymérés","Ha ma van a szokásos mérési napod, rögzítsd a testsúlyodat."],
+  backup:["Lock in – adatmentés","A heti adatmentési emlékeztetőd: töltsd le a mentésfájlt a Mentés fülön."]
  };
  return messages[type]||messages.water;
 }
